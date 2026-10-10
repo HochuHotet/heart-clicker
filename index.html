@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0006">
+<title>Кликер сердечек ❤</title>
+<style>
+  :root {
+    --fs-huge:  clamp(22px, 6.5vw, 40px);
+    --fs-mid:   clamp(11px, 2.6vw, 13px);
+    --fs-small: clamp(10px, 2.2vw, 12px);
+    --fs-tiny:  clamp(9px, 2vw, 11px);
+    --gap:      clamp(6px, 1.5vw, 10px);
+    --pad:      clamp(10px, 3vw, 20px);
+    --radius:   clamp(10px, 2vw, 14px);
+    --heart:    clamp(110px, 32vw, 170px);
+    --stage:    clamp(200px, 55vw, 300px);
+    --rings:    1;
+    --aura:     1;
+    --blur:     blur(6px);
+    --safe-l: env(safe-area-inset-left, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --c1: #ff2d55;
+    --c2: #ff8fab;
+    --c3: #ffd700;
+    --bg-dark: #0a0006;
+  }
+  @media (max-width: 720px) { :root { --rings: 0; --blur: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    :root { --rings: 0; }
+    *, *::before, *::after { animation-duration: 0.001ms !important; }
+  }
+
+  *, *::before, *::after {
+    margin: 0; padding: 0; box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html { height: 100%; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at center, #1a0010 0%, var(--bg-dark) 100%);
+    overflow: hidden;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+    user-select: none; -webkit-user-select: none;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+  }
+
+  /* Обёртка для тряски — сюда попадает shake */
+  .game {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: var(--gap);
+    padding: calc(var(--safe-t) + var(--pad))
+             calc(var(--safe-r) + var(--pad))
+             calc(var(--safe-b) + var(--pad))
+             calc(var(--safe-l) + var(--pad));
+    width: 100%;
+    will-change: transform;
+    transform-origin: center;
+  }
+
+  #fx {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 9;
+    will-change: transform;
+  }
+
+  /* СЧЁТЧИК */
+  .stats { text-align: center; z-index: 2; contain: layout style; }
+  .counter {
+    font-size: var(--fs-huge); font-weight: 800;
+    color: var(--c2);
+    text-shadow: 0 0 18px var(--c1);
+    line-height: 1.1;
+    transition: transform 0.08s;
+    will-change: transform;
+  }
+  .counter.pop { transform: scale(1.15); }
+  .rates {
+    font-size: var(--fs-mid); color: var(--c2); opacity: 0.85;
+    margin-top: 2px; letter-spacing: 0.5px;
+  }
+  .combo-wrap {
+    width: min(220px, 60vw); height: 5px;
+    margin: 6px auto 0;
+    background: rgba(255,45,85,0.15);
+    border-radius: 3px; overflow: hidden;
+  }
+  .combo-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--c1), var(--c3));
+    transition: width 0.15s linear;
+    will-change: width;
+  }
+  .combo-label {
+    font-size: var(--fs-tiny); color: var(--c3);
+    margin-top: 2px; opacity: 0;
+    transition: opacity 0.2s;
+    height: 14px;
+  }
+  .combo-label.show { opacity: 1; }
+  .shards-info {
+    font-size: var(--fs-small); color: var(--c3);
+    text-shadow: 0 0 8px var(--c3);
+    opacity: 0; transition: opacity 0.3s;
+    height: 16px; margin-top: 2px;
+  }
+  .shards-info.show { opacity: 1; }
+
+  /* СЕРДЦЕ */
+  .heart-stage {
+    width: var(--stage); height: var(--stage);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 1; position: relative;
+    touch-action: manipulation;
+  }
+  .glow-aura {
+    position: absolute; top: 50%; left: 50%;
+    width: 100%; height: 100%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,45,85,0.35) 0%, transparent 65%);
+    pointer-events: none;
+    animation: auraBreathe 2.2s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+  @keyframes auraBreathe {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+    50%      { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  }
+  .glow-ring {
+    position: absolute; top: 50%; left: 50%;
+    width: 55%; height: 55%;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 45, 85, 0.5);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: ringPulse 2.6s ease-out infinite;
+    display: calc(var(--rings) * 1px + 0px);
+    will-change: transform, opacity;
+  }
+  .glow-ring:nth-child(3) { animation-delay: 0.85s; }
+  .glow-ring:nth-child(4) { animation-delay: 1.7s; }
+  @keyframes ringPulse {
+    0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+    30%  { opacity: 0.6; }
+    100% { transform: translate(-50%, -50%) scale(1.7); opacity: 0; }
+  }
+
+  .heart-wrap {
+    position: relative;
+    animation: idleBeat 1.4s ease-in-out infinite;
+    will-change: transform;
+    transform-origin: center;
+  }
+  /* Пока идёт hit-анимация — CSS-биение снято, WAAPI рулит */
+  .heart-wrap.hitting { animation: none; }
+
+  /* Мгновенный squash при pointerdown */
+  .heart-stage.pressing .heart-wrap:not(.hitting) {
+    animation: none;
+    transform: scale(0.72, 0.86) rotate(-3deg);
+    transition: transform 0.05s cubic-bezier(.4,0,.9,.6);
+  }
+
+  @keyframes idleBeat {
+    0%   { transform: scale(1) rotate(0); }
+    12%  { transform: scale(1.14) rotate(-1deg); }
+    24%  { transform: scale(0.98) rotate(1deg); }
+    40%  { transform: scale(1.08) rotate(0); }
+    60%  { transform: scale(1) rotate(0); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  .heart-svg {
+    width: var(--heart); height: var(--heart);
+    display: block;
+    filter: drop-shadow(0 0 18px var(--c1)) drop-shadow(0 0 40px var(--c1));
+    transition: filter 0.12s;
+    animation: idleTremor 0.35s ease-in-out infinite;
+    will-change: transform, filter;
+  }
+  /* Микротремор — «жужжание» сердца в покое */
+  @keyframes idleTremor {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    25%      { transform: translate(0.4px, -0.3px) rotate(0.2deg); }
+    50%      { transform: translate(-0.35px, 0.4px) rotate(-0.15deg); }
+    75%      { transform: translate(0.3px, -0.3px) rotate(0.1deg); }
+  }
+  /* При высоком комбо — сильнее тремор */
+  .heart-stage.hot .heart-svg {
+    animation-duration: 0.18s;
+    filter: drop-shadow(0 0 25px var(--c2)) drop-shadow(0 0 55px var(--c1)) drop-shadow(0 0 80px var(--c3));
+  }
+
+  @media (max-width: 720px) {
+    .heart-svg { filter: drop-shadow(0 0 20px var(--c1)); }
+    .heart-stage.hot .heart-svg { filter: drop-shadow(0 0 30px var(--c1)); }
+  }
+  .heart-stage.pressing .heart-svg {
+    filter: drop-shadow(0 0 30px #fff) drop-shadow(0 0 60px var(--c1));
+  }
+  .heart-stage.crit .heart-svg {
+    filter: drop-shadow(0 0 40px #fff) drop-shadow(0 0 80px var(--c3));
+  }
+  .half { transform-box: fill-box; }
+  .half-left  { transform-origin: 100% 50%; }
+  .half-right { transform-origin: 0% 50%; }
+
+  /* АПГРЕЙДЫ */
+  .upgrades {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap);
+    width: 100%; max-width: 700px;
+    z-index: 2;
+  }
+  @media (min-width: 640px) {
+    .upgrades { grid-template-columns: repeat(5, 1fr); }
+  }
+  .upgrade-btn {
+    background: linear-gradient(135deg, var(--c1), var(--c2));
+    border: none; color: #fff;
+    padding: clamp(8px, 1.8vw, 12px) clamp(4px, 1.2vw, 8px);
+    border-radius: var(--radius);
+    font-size: var(--fs-small); font-weight: 700;
+    font-family: inherit;
+    cursor: pointer; text-align: center; line-height: 1.25;
+    min-height: 56px;
+    transition: transform 0.12s, opacity 0.2s;
+    will-change: transform;
+    touch-action: manipulation;
+  }
+  .upgrade-btn:not(:disabled):hover { transform: translateY(-3px); }
+  .upgrade-btn:not(:disabled):active { transform: translateY(-1px) scale(0.94); }
+  .upgrade-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .upgrade-btn .name { display: block; font-size: var(--fs-mid); font-weight: 700; }
+  .upgrade-btn .lvl  { display: block; font-size: var(--fs-tiny); opacity: 0.9; margin-top: 2px; }
+  .upgrade-btn .cost { display: block; font-size: var(--fs-tiny); margin-top: 3px; }
+  .upgrade-btn .eff  { display: block; font-size: var(--fs-tiny); opacity: 0.8; }
+
+  /* НИЖНЯЯ ПАНЕЛЬ */
+  .bottom-bar {
+    display: flex; gap: var(--gap);
+    flex-wrap: wrap; justify-content: center;
+    z-index: 2;
+  }
+  .btn-primary, .btn-tree, .btn-icon {
+    background: linear-gradient(135deg, #2a0010, var(--c1));
+    border: 2px solid var(--c1);
+    color: #fff;
+    padding: clamp(9px, 2vw, 12px) clamp(14px, 3vw, 22px);
+    border-radius: var(--radius);
+    font-size: var(--fs-mid); font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.2s;
+    will-change: transform;
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+  .btn-primary:active, .btn-tree:active, .btn-icon:active { transform: scale(0.94); }
+  .btn-primary.unavailable { opacity: 0.45; filter: grayscale(0.4); }
+  .btn-primary.ready { animation: readyPulse 1.4s ease-in-out infinite; }
+  @keyframes readyPulse {
+    0%,100% { box-shadow: 0 0 15px rgba(255,45,85,0.5); }
+    50%     { box-shadow: 0 0 35px rgba(255,215,0,0.9); }
+  }
+  .btn-primary small, .btn-tree small {
+    display: block; font-weight: 400;
+    font-size: var(--fs-tiny); opacity: 0.85;
+    margin-top: 3px;
+  }
+  .btn-tree {
+    background: linear-gradient(135deg, #001a2a, #2d9dff);
+    border-color: #2d9dff;
+  }
+  .btn-tree .badge {
+    display: inline-block; background: var(--c3); color: #000;
+    padding: 1px 7px; border-radius: 10px;
+    font-size: var(--fs-tiny); margin-left: 4px; font-weight: 700;
+  }
+  .btn-icon {
+    padding: clamp(9px, 2vw, 12px) clamp(12px, 2.5vw, 16px);
+    background: linear-gradient(135deg, #1a1a1a, #555);
+    border-color: #888;
+    font-size: calc(var(--fs-mid) + 3px);
+  }
+
+  /* МОДАЛКИ */
+  .modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none; justify-content: center; align-items: center;
+    z-index: 100;
+    padding: calc(var(--safe-t) + 16px) calc(var(--safe-r) + 16px)
+             calc(var(--safe-b) + 16px) calc(var(--safe-l) + 16px);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+  }
+  .modal.open { display: flex; }
+  .panel {
+    background: linear-gradient(180deg, #180018 0%, var(--bg-dark) 100%);
+    border: 2px solid var(--c1);
+    border-radius: 20px;
+    padding: clamp(16px, 4vw, 26px);
+    max-width: 700px; width: 100%;
+    max-height: 92vh; max-height: 92dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+  .panel h2 {
+    font-size: var(--fs-huge); margin-bottom: 4px;
+    text-align: center; color: var(--c2);
+  }
+  .panel-desc {
+    font-size: var(--fs-small); color: var(--c2);
+    opacity: 0.8; text-align: center; margin-bottom: 12px;
+  }
+  .close-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: transparent; border: 1px solid var(--c1);
+    color: var(--c2); width: 34px; height: 34px;
+    border-radius: 50%; cursor: pointer;
+    font-size: 18px; line-height: 1; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .close-btn:hover { background: var(--c1); color: #fff; }
+
+  .tree-shards {
+    text-align: center; font-size: calc(var(--fs-huge) * 0.55);
+    color: var(--c3); font-weight: 700; margin-bottom: 16px;
+  }
+  .tree-area {
+    position: relative;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: clamp(20px, 6vw, 40px) clamp(6px, 1.5vw, 14px);
+    padding: 16px 8px;
+  }
+  .tree-lines {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+  .tree-node {
+    position: relative; z-index: 1;
+    background: linear-gradient(180deg, #2a0020 0%, #150010 100%);
+    border: 2px solid #55103a;
+    border-radius: var(--radius);
+    padding: clamp(6px, 1.5vw, 10px) clamp(3px, 1vw, 6px);
+    text-align: center; cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    font-size: var(--fs-tiny); line-height: 1.3;
+    min-height: 78px;
+    display: flex; flex-direction: column; justify-content: center;
+    touch-action: manipulation;
+    will-change: transform;
+  }
+  .tree-node .icon { font-size: clamp(18px, 4vw, 22px); line-height: 1; }
+  .tree-node .name { display: block; font-weight: 700; font-size: var(--fs-tiny); margin-top: 2px; }
+  .tree-node .lvl  { display: block; font-size: var(--fs-tiny); color: var(--c2); margin-top: 1px; }
+  .tree-node .cost { display: block; font-size: var(--fs-tiny); margin-top: 2px; }
+  .tree-node.available { border-color: var(--c1); }
+  .tree-node.available:active { transform: scale(0.94); }
+  .tree-node.locked { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.7); }
+  .tree-node.owned { border-color: var(--c3); }
+  .tree-node.maxed {
+    border-color: var(--c3);
+    background: linear-gradient(180deg, #3a2a00 0%, #1a1000 100%);
+  }
+  .tree-node .cost.cheap { color: #7dff7d; }
+  .tree-node .cost.poor { color: #ff7d7d; }
+
+  .confirm-panel {
+    background: linear-gradient(180deg, #1a0010 0%, var(--bg-dark) 100%);
+    border: 2px solid var(--c1);
+    border-radius: 20px;
+    padding: clamp(20px, 5vw, 28px) clamp(16px, 4vw, 26px);
+    max-width: 420px; width: 100%;
+    text-align: center;
+  }
+  .confirm-panel .big-icon { font-size: clamp(44px, 12vw, 56px); line-height: 1; margin-bottom: 8px; }
+  .confirm-panel h3 { font-size: var(--fs-huge); margin-bottom: 12px; color: var(--c2); }
+  .confirm-panel p {
+    font-size: var(--fs-mid); line-height: 1.6; color: var(--c2); margin-bottom: 8px;
+  }
+  .confirm-panel .highlight { color: var(--c3); font-weight: 700; }
+  .confirm-panel .buttons { display: flex; gap: 10px; margin-top: 20px; }
+  .confirm-panel button {
+    flex: 1; padding: 14px 20px;
+    border-radius: 12px; border: none;
+    font-size: var(--fs-mid); font-weight: 700; font-family: inherit;
+    cursor: pointer; min-height: 48px;
+    transition: transform 0.12s;
+    touch-action: manipulation;
+  }
+  .btn-cancel {
+    background: transparent;
+    border: 2px solid #55103a !important;
+    color: var(--c2);
+  }
+  .btn-confirm {
+    background: linear-gradient(135deg, var(--c1), var(--c2)); color: #fff;
+  }
+  .btn-confirm:active, .btn-cancel:active { transform: scale(0.96); }
+
+  .settings-section {
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px dashed rgba(255,45,85,0.3);
+  }
+  .settings-section h4 {
+    font-size: var(--fs-mid); color: var(--c3); margin-bottom: 10px;
+  }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 4px;
+    border-bottom: 1px solid rgba(255,45,85,0.1);
+    gap: 10px; flex-wrap: wrap;
+  }
+  .settings-row label { font-size: var(--fs-mid); color: var(--c2); }
+  .settings-row input[type="range"] {
+    flex: 1; min-width: 100px; max-width: 200px;
+    accent-color: var(--c1); touch-action: manipulation;
+  }
+  .settings-row input[type="checkbox"] {
+    width: 22px; height: 22px; accent-color: var(--c1);
+    cursor: pointer; touch-action: manipulation;
+  }
+  .settings-row .value {
+    color: var(--c3); font-weight: 700; min-width: 40px;
+    text-align: right; font-size: var(--fs-small);
+  }
+  .settings-actions {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+  }
+  .settings-actions button {
+    flex: 1; min-width: 100px;
+    padding: 11px 14px; border-radius: 10px; border: none;
+    font-size: var(--fs-small); font-weight: 700; font-family: inherit;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--c1), var(--c2)); color: #fff;
+    transition: transform 0.12s;
+    min-height: 44px; touch-action: manipulation;
+  }
+  .settings-actions button:active { transform: scale(0.95); }
+  .settings-actions button.danger { background: linear-gradient(135deg, #3a0000, #900); }
+  .settings-actions button.info { background: linear-gradient(135deg, #0a2a4a, #2d9dff); }
+  .settings-hint {
+    font-size: var(--fs-tiny); color: var(--c2);
+    opacity: 0.75; line-height: 1.6; margin-top: 8px;
+  }
+  .settings-hint code {
+    background: rgba(255,45,85,0.15); padding: 1px 5px;
+    border-radius: 4px; font-family: ui-monospace, monospace; color: var(--c3);
+  }
+
+  .reset-btn {
+    position: fixed;
+    top: calc(var(--safe-t) + 10px);
+    right: calc(var(--safe-r) + 10px);
+    background: transparent; border: 1px solid var(--c1);
+    color: var(--c2); padding: 6px 12px;
+    border-radius: 8px; font-size: var(--fs-tiny); font-family: inherit;
+    cursor: pointer; opacity: 0.6; z-index: 5;
+    transition: opacity 0.15s; touch-action: manipulation;
+  }
+  .reset-btn:hover { opacity: 1; }
+
+  .flash-overlay {
+    position: fixed; inset: 0; background: #fff;
+    pointer-events: none; opacity: 0; z-index: 99;
+    transition: opacity 0.15s;
+  }
+  .flash-overlay.on { opacity: 1; }
+
+  .toast {
+    position: fixed;
+    bottom: calc(var(--safe-b) + 80px); left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(26, 0, 16, 0.95);
+    border: 2px solid var(--c1); color: var(--c2);
+    padding: 10px 18px; border-radius: 12px;
+    font-size: var(--fs-mid); font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 200; pointer-events: none;
+    max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Мега-тряска при ребитхе (на .game) */
+  @keyframes megaShake {
+    0%,100% { transform: translate(0,0) rotate(0); }
+    10% { transform: translate(-18px, 10px) rotate(-2.5deg); }
+    25% { transform: translate(18px, -12px) rotate(2.5deg); }
+    40% { transform: translate(-14px, -10px) rotate(-2deg); }
+    55% { transform: translate(14px, 12px) rotate(2deg); }
+    70% { transform: translate(-8px, 5px) rotate(-1deg); }
+    85% { transform: translate(8px, -5px) rotate(1deg); }
+  }
+  .game.mega-shake { animation: megaShake 0.7s ease-out; }
+
+  @media (max-height: 560px) and (orientation: landscape) {
+    :root {
+      --fs-huge: clamp(20px, 4vw, 30px);
+      --heart: clamp(80px, 14vh, 110px);
+      --stage: clamp(120px, 30vh, 180px);
+    }
+    .game { gap: 4px; }
+    .upgrades { grid-template-columns: repeat(5, 1fr); }
+    .heart-stage { margin: -10px 0; }
+  }
+</style>
+</head>
+<body>
+
+  <canvas id="fx"></canvas>
+
+  <div class="game" id="game">
+    <div class="stats">
+      <div class="counter" id="counter">0 ❤</div>
+      <div class="rates">
+        <span id="perClick">+1 / клик</span> · <span id="perSec">+0 / сек</span><span id="critInfo"></span>
+      </div>
+      <div class="combo-wrap"><div class="combo-fill" id="comboFill"></div></div>
+      <div class="combo-label" id="comboLabel">🔥 Комбо x0</div>
+      <div class="shards-info" id="shardsInfo">💎 0</div>
+    </div>
+
+    <div class="heart-stage" id="heart">
+      <div class="glow-aura"></div>
+      <div class="glow-ring"></div>
+      <div class="glow-ring"></div>
+      <div class="glow-ring"></div>
+      <div class="heart-wrap">
+        <svg class="heart-svg" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ff5e7e"/>
+              <stop offset="60%" stop-color="#ff2d55"/>
+              <stop offset="100%" stop-color="#c91034"/>
+            </linearGradient>
+          </defs>
+          <path class="half half-left"  d="M 50 80 C 20 55, 0 35, 0 22 C 0 8, 15 0, 28 0 C 40 0, 48 10, 50 20 Z" fill="url(#hg)"/>
+          <path class="half half-right" d="M 50 80 C 80 55, 100 35, 100 22 C 100 8, 85 0, 72 0 C 60 0, 52 10, 50 20 Z" fill="url(#hg)"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="upgrades" id="upgrades"></div>
+
+    <div class="bottom-bar">
+      <button class="btn-primary unavailable" id="prestigeBtn">
+        💔 Ребитх
+        <small id="prestigeInfo">нужно 1K ❤</small>
+      </button>
+      <button class="btn-tree" id="treeBtn">
+        🌳 Древо <span class="badge" id="treeBadge">0</span>
+      </button>
+      <button class="btn-icon" id="settingsBtn" title="Настройки" aria-label="Настройки">⚙️</button>
+    </div>
+  </div>
+
+  <button class="reset-btn" id="resetBtn">сброс</button>
+  <div class="flash-overlay" id="flash"></div>
+
+  <div class="modal" id="treeModal">
+    <div class="panel">
+      <button class="close-btn" id="closeTree" aria-label="Закрыть">×</button>
+      <h2>🌳 Древо ребитхов</h2>
+      <p class="panel-desc">Постоянные бонусы за 💎 осколки</p>
+      <div class="tree-shards">💎 <span id="treeShards">0</span></div>
+      <div class="tree-area">
+        <svg class="tree-lines" id="treeLines" preserveAspectRatio="none"></svg>
+        <div id="treeGrid" style="display: contents"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmModal">
+    <div class="confirm-panel">
+      <div class="big-icon">💔</div>
+      <h3>Ребитх?</h3>
+      <p>За заход: <span class="highlight" id="cEarned">0</span></p>
+      <p>Получишь: <span class="highlight" id="cGain">+0 💎</span></p>
+      <p>Сейчас: <span class="highlight" id="cShards">0</span> 💎</p>
+      <p style="margin-top:10px;font-size:var(--fs-tiny);opacity:0.8">Сбросится счётчик и апгрейды. Останутся осколки и древо.</p>
+      <div class="buttons">
+        <button class="btn-cancel" id="cCancel">Отмена</button>
+        <button class="btn-confirm" id="cConfirm">Ребитх</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="settingsModal">
+    <div class="panel">
+      <button class="close-btn" id="closeSettings" aria-label="Закрыть">×</button>
+      <h2>⚙️ Настройки</h2>
+      <p class="panel-desc">Звук, сохранение, экспорт</p>
+
+      <div class="settings-section">
+        <h4>🔊 Звук</h4>
+        <div class="settings-row">
+          <label for="sndEnabled">Включить</label>
+          <input type="checkbox" id="sndEnabled">
+        </div>
+        <div class="settings-row">
+          <label for="sndVolume">Общая</label>
+          <input type="range" id="sndVolume" min="0" max="100" value="50">
+          <span class="value" id="sndVolumeVal">50%</span>
+        </div>
+        <div class="settings-row">
+          <label for="sndClick">Клик</label>
+          <input type="range" id="sndClick" min="0" max="100" value="60">
+          <span class="value" id="sndClickVal">60%</span>
+        </div>
+        <div class="settings-row">
+          <label for="sndEvents">События</label>
+          <input type="range" id="sndEvents" min="0" max="100" value="80">
+          <span class="value" id="sndEventsVal">80%</span>
+        </div>
+        <div class="settings-actions">
+          <button class="info" id="testClick">▶ Клик</button>
+          <button class="info" id="testCrit">▶ Крит</button>
+          <button class="info" id="testBuy">▶ Покупка</button>
+          <button class="info" id="testRebirth">▶ Ребитх</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h4>💾 Сохранение</h4>
+        <div class="settings-actions">
+          <button class="info" id="exportSave">📤 Экспорт</button>
+          <button class="info" id="importSave">📥 Импорт</button>
+          <button class="danger" id="hardReset">☠ Сброс</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h4>🛠 Для разработки</h4>
+        <p class="settings-hint">
+          Настройки в <code>CONFIG</code>, апгрейды в <code>UPGRADES</code>, древо в <code>TREE</code>,
+          звуки в <code>SOUND_TEMPLATES</code>. Добавь новый ключ — UI подхватит автоматически.
+        </p>
+        <div class="settings-actions">
+          <button class="info" id="showConfig">📋 Показать CONFIG</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ══════ КОНФИГУРАЦИЯ ══════ */
+const CONFIG = {
+  rebirthThreshold: 1000,
+  shardDivisor: 1000,
+  shardBonusBase: 0.15,
+  comboDecayMs: 800,
+  comboDecayDelayMs: 400,
+  comboMaxBase: 10,
+  comboBonusPerStackBase: 0.02,
+  critChanceBase: 0,
+  critMultBase: 5,
+  saveKey: 'heartClickerV7',
+  autoSaveMs: 3000,
+  saveDebounceMs: 800,
+  soundDefaults: { enabled: true, masterVolume: 0.5, clickVolume: 0.6, eventsVolume: 0.8 },
+  // Динамика
+  hitShakeBase: 2.2,      // базовая тряска экрана за клик (px)
+  hitShakeCrit: 7,        // при крит
+  hitShakeCombo: 1.6,     // множитель при макс. комбо
+};
+
+/* ══════ ЗВУКИ ══════ */
+const SOUND_TEMPLATES = {
+  click: { layers: [
+    { type: 'sine', freq: 900, freqEnd: 1400, duration: 0.05, volume: 0.15, randomDetune: 0.15 },
+    { type: 'triangle', freq: 1800, duration: 0.03, volume: 0.06 },
+  ]},
+  crit: { layers: [
+    { type: 'sawtooth', freq: 700, freqEnd: 2400, duration: 0.14, volume: 0.22 },
+    { type: 'sine', freq: 1200, freqEnd: 2800, duration: 0.1, volume: 0.15, delay: 0.02 },
+    { type: 'triangle', freq: 3000, duration: 0.06, volume: 0.1, delay: 0.1 },
+  ]},
+  buyUpgrade: { layers: [
+    { type: 'triangle', freq: 523, duration: 0.09, volume: 0.2 },
+    { type: 'triangle', freq: 659, duration: 0.09, volume: 0.2, delay: 0.06 },
+    { type: 'triangle', freq: 784, duration: 0.12, volume: 0.22, delay: 0.12 },
+  ]},
+  buyNode: { layers: [
+    { type: 'sine', freq: 1046, duration: 0.15, volume: 0.22 },
+    { type: 'sine', freq: 1568, duration: 0.2, volume: 0.18, delay: 0.06 },
+    { type: 'triangle', freq: 2093, duration: 0.1, volume: 0.08, delay: 0.12 },
+  ]},
+  rebirth: { layers: [
+    { type: 'sine', freq: 90, freqEnd: 35, duration: 1.2, volume: 0.4 },
+    { type: 'sawtooth', freq: 150, freqEnd: 1800, duration: 0.8, volume: 0.2, delay: 0.15 },
+    { type: 'square', freq: 3000, freqEnd: 200, duration: 0.3, volume: 0.15, delay: 0.7 },
+    { type: 'triangle', freq: 523, duration: 0.5, volume: 0.22, delay: 1.0 },
+    { type: 'triangle', freq: 659, duration: 0.5, volume: 0.22, delay: 1.02 },
+    { type: 'triangle', freq: 784, duration: 0.5, volume: 0.22, delay: 1.04 },
+    { type: 'triangle', freq: 1046, duration: 0.6, volume: 0.2, delay: 1.06 },
+  ]},
+  shard: { layers: [
+    { type: 'triangle', freq: 1500, freqEnd: 2800, duration: 0.15, volume: 0.2, randomDetune: 0.1 },
+    { type: 'sine', freq: 3200, duration: 0.1, volume: 0.1, delay: 0.05 },
+  ]},
+  error: { layers: [
+    { type: 'square', freq: 220, freqEnd: 130, duration: 0.18, volume: 0.15 },
+    { type: 'square', freq: 160, freqEnd: 90, duration: 0.2, volume: 0.12, delay: 0.05 },
+  ]},
+  comboMax: { layers: [
+    { type: 'triangle', freq: 880, duration: 0.12, volume: 0.18 },
+    { type: 'triangle', freq: 1100, duration: 0.12, volume: 0.18, delay: 0.06 },
+    { type: 'triangle', freq: 1320, duration: 0.18, volume: 0.2, delay: 0.12 },
+  ]},
+  open:  { layers: [{ type: 'sine', freq: 600, freqEnd: 900, duration: 0.1, volume: 0.12 }] },
+  close: { layers: [{ type: 'sine', freq: 900, freqEnd: 500, duration: 0.1, volume: 0.1 }] },
+};
+
+/* ══════ ДЕРЕВО ══════ */
+const TREE = {
+  root:         { icon: '💗', name: 'Основа',         desc: 'Открывает ветки',      maxLevel: 1, costs: [0],                    col: 1, row: 0, requires: [], apply: () => {} },
+  startClick:   { icon: '🌱', name: 'Старт-клик',     desc: '+3 к базе',            maxLevel: 5, costs: [1, 3, 8, 20, 50],       col: 0, row: 1, requires: ['root'], apply: (m,l)=>{ m.clickFlat += l*3; } },
+  autoBoost:    { icon: '⚡', name: 'Ускоритель',     desc: '+1 к авто',            maxLevel: 5, costs: [2, 5, 12, 30, 70],      col: 1, row: 1, requires: ['root'], apply: (m,l)=>{ m.autoFlat += l; } },
+  critMaster:   { icon: '💥', name: 'Крит-мастер',    desc: 'Крит-множ +1',         maxLevel: 5, costs: [3, 8, 20, 50, 120],     col: 2, row: 1, requires: ['root'], apply: (m,l)=>{ m.critMult += l; } },
+  comboMaster:  { icon: '🔥', name: 'Комбо-мастер',   desc: '+0.5% комбо/стек',     maxLevel: 5, costs: [5, 15, 40, 100, 250],   col: 0, row: 2, requires: ['startClick'], apply: (m,l)=>{ m.comboBonusPerStack += l*0.005; } },
+  hyperMulti:   { icon: '✨', name: 'Гипер-множ',     desc: 'База множителя ↑',     maxLevel: 5, costs: [10, 25, 60, 150, 400],  col: 1, row: 2, requires: ['autoBoost'], apply: (m,l)=>{ m.multiBase += l*0.05; } },
+  critChance:   { icon: '🎯', name: 'Точный удар',    desc: '+2% крит-шанс',        maxLevel: 5, costs: [8, 20, 50, 120, 300],   col: 2, row: 2, requires: ['critMaster'], apply: (m,l)=>{ m.critChance += l*0.02; } },
+  crystalBoost: { icon: '💰', name: 'Сила осколков',  desc: '+5% за осколок',       maxLevel: 5, costs: [20, 50, 120, 300, 700], col: 0, row: 3, requires: ['comboMaster'], apply: (m,l)=>{ m.shardBonus += l*0.05; } },
+  autoPower:    { icon: '⚡', name: 'Супер-авто',     desc: '+2 к авто',            maxLevel: 3, costs: [30, 100, 300],           col: 1, row: 3, requires: ['hyperMulti'], apply: (m,l)=>{ m.autoFlat += l*2; } },
+  ultraCrit:    { icon: '🌟', name: 'Ультра-крит',    desc: 'Ещё +1 крит-множ',     maxLevel: 3, costs: [40, 120, 400],           col: 2, row: 3, requires: ['critChance'], apply: (m,l)=>{ m.critMult += l; } },
+  ultimate:     { icon: '💎', name: 'Абсолют',        desc: '×2 ко всему',          maxLevel: 3, costs: [150, 500, 1500],         col: 1, row: 4, requires: ['crystalBoost','autoPower','ultraCrit'], apply: (m,l)=>{ m.globalMult *= Math.pow(2, l); } },
+};
+
+/* ══════ АПГРЕЙДЫ ══════ */
+const UPGRADES = {
+  click: { name: '👆 Сила клика', baseCost: 15,   growth: 1.15, maxLevel: 999,
+    effText: l => `+${1 + l} за клик`, apply: (m,l)=>{ m.clickFlat += l; } },
+  auto:  { name: '⚙️ Авто-клик',  baseCost: 100,  growth: 1.15, maxLevel: 999,
+    effText: l => `${l} / сек`,        apply: (m,l)=>{ m.autoFlat += l; } },
+  multi: { name: '✨ Множитель',  baseCost: 2500, growth: 1.5,  maxLevel: 999,
+    effText: l => `×${Math.pow(1.4,l).toFixed(2)}`, apply: (m,l)=>{
+      const mult = Math.pow(1.4 + (m.multiBase - 1.4), l);
+      m.clickMult *= mult; m.autoMult *= mult;
+    }},
+  crit:  { name: '💥 Крит',       baseCost: 800,  growth: 1.2,  maxLevel: 999,
+    effText: l => `${(l*4).toFixed(0)}%`, apply: (m,l)=>{ m.critChance += l*0.04; } },
+  combo: { name: '🔥 Комбо',      baseCost: 5000, growth: 1.35, maxLevel: 999,
+    effText: l => `x${10 + l*10}`,     apply: (m,l)=>{ m.comboMax += l*10; } },
+};
+
+/* ══════ АУДИО ══════ */
+let audioCtx = null;
+let audioSettings = { ...CONFIG.soundDefaults };
+function loadAudioSettings() {
+  try {
+    const raw = localStorage.getItem(CONFIG.saveKey + '_audio');
+    if (raw) Object.assign(audioSettings, JSON.parse(raw));
+  } catch(e) {}
+}
+function saveAudioSettings() {
+  try { localStorage.setItem(CONFIG.saveKey + '_audio', JSON.stringify(audioSettings)); } catch(e) {}
+}
+function initAudio() {
+  if (audioCtx) {
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    return;
+  }
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+}
+let soundBudget = { click: 0, crit: 0, lastReset: 0 };
+function playSound(name, opts = {}) {
+  if (!audioSettings.enabled) return;
+  const now = performance.now();
+  if (now - soundBudget.lastReset > 100) soundBudget = { click: 0, crit: 0, lastReset: now };
+  if (name === 'click' || name === 'crit') {
+    if (soundBudget[name] >= 8) return;
+    soundBudget[name]++;
+  }
+  initAudio();
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  const tmpl = SOUND_TEMPLATES[name];
+  if (!tmpl) return;
+  const t0 = audioCtx.currentTime;
+  const master = audioCtx.createGain();
+  const isClick = (name === 'click' || name === 'crit');
+  const vol = (isClick ? audioSettings.clickVolume : audioSettings.eventsVolume)
+            * audioSettings.masterVolume * (opts.volumeMul || 1);
+  master.gain.value = vol;
+  master.connect(audioCtx.destination);
+  for (const layer of tmpl.layers) {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = layer.type || 'sine';
+    let freq = layer.freq;
+    if (layer.randomDetune) freq *= 1 + (Math.random() - 0.5) * layer.randomDetune * 2;
+    osc.frequency.setValueAtTime(freq, t0);
+    const d = layer.duration ?? 0.1;
+    const dl = layer.delay ?? 0;
+    if (layer.freqEnd != null) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, layer.freqEnd), t0 + dl + d);
+    }
+    g.gain.setValueAtTime(0, t0 + dl);
+    g.gain.linearRampToValueAtTime(layer.volume ?? 0.2, t0 + dl + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dl + d);
+    osc.connect(g); g.connect(master);
+    osc.start(t0 + dl); osc.stop(t0 + dl + d + 0.02);
+  }
+}
+
+/* ══════ СОСТОЯНИЕ ══════ */
+const state = { count: 0, runEarned: 0, allEarned: 0, upgrades: {}, shards: 0, tree: {} };
+let combo = 0;
+let lastClickTime = 0;
+let modsDirty = true;
+let cachedMods = null;
+let uiDirty = true;
+let saveDirty = false;
+let saveTimer = null;
+
+/* ══════ ФОРМУЛЫ ══════ */
+function computeMods() {
+  if (!modsDirty && cachedMods) return cachedMods;
+  const m = {
+    clickFlat: 1, autoFlat: 0, clickMult: 1, autoMult: 1,
+    critChance: CONFIG.critChanceBase, critMult: CONFIG.critMultBase,
+    comboMax: CONFIG.comboMaxBase, comboBonusPerStack: CONFIG.comboBonusPerStackBase,
+    shardBonus: CONFIG.shardBonusBase, multiBase: 1.4, globalMult: 1,
+  };
+  for (const k in UPGRADES) {
+    const l = state.upgrades[k] || 0;
+    if (l > 0) UPGRADES[k].apply(m, l);
+  }
+  for (const id in TREE) {
+    const l = state.tree[id] || 0;
+    if (l > 0) TREE[id].apply(m, l);
+  }
+  cachedMods = m; modsDirty = false;
+  return m;
+}
+function invalidateMods() { modsDirty = true; }
+function shardMultiplier() { return Math.pow(1 + computeMods().shardBonus, state.shards); }
+function comboBonus() { return 1 + combo * computeMods().comboBonusPerStack; }
+function maxCombo() { return computeMods().comboMax; }
+function critMult() { return computeMods().critMult; }
+function critChance() { return Math.min(0.9, computeMods().critChance); }
+function clickPowerBase() {
+  const m = computeMods();
+  return m.clickFlat * m.clickMult * m.globalMult * shardMultiplier();
+}
+function clickPower() { return clickPowerBase() * comboBonus(); }
+function autoPerSec() {
+  const m = computeMods();
+  return m.autoFlat * m.autoMult * m.globalMult * shardMultiplier();
+}
+function upgradeCost(key) {
+  const u = UPGRADES[key];
+  return Math.floor(u.baseCost * Math.pow(u.growth, state.upgrades[key] || 0));
+}
+function treeLevel(id) { return state.tree[id] || 0; }
+function treeCost(id) {
+  const n = TREE[id]; const l = treeLevel(id);
+  return l >= n.maxLevel ? Infinity : n.costs[l];
+}
+function treeUnlocked(id) { return TREE[id].requires.every(r => treeLevel(r) > 0); }
+function calcShards(e) { return Math.max(0, Math.floor(Math.sqrt(e / CONFIG.shardDivisor))); }
+function formatNum(n) {
+  if (n < 1000) return Math.floor(n).toString();
+  const u = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc'];
+  let i = -1;
+  while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+  return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
+}
+
+/* ══════ DOM ══════ */
+const $ = id => document.getElementById(id);
+const counterEl = $('counter'), perClickEl = $('perClick'), perSecEl = $('perSec');
+const critInfoEl = $('critInfo'), comboFillEl = $('comboFill'), comboLabelEl = $('comboLabel');
+const shardsInfoEl = $('shardsInfo'), heartEl = $('heart'), upgradesEl = $('upgrades');
+const resetBtn = $('resetBtn'), prestigeBtn = $('prestigeBtn'), prestigeInfo = $('prestigeInfo');
+const treeBtn = $('treeBtn'), treeBadge = $('treeBadge'), treeModal = $('treeModal');
+const treeGrid = $('treeGrid'), treeLines = $('treeLines'), treeShardsEl = $('treeShards');
+const closeTreeBtn = $('closeTree'), flashEl = $('flash');
+const confirmModal = $('confirmModal'), cEarned = $('cEarned'), cGain = $('cGain');
+const cShards = $('cShards'), cCancel = $('cCancel'), cConfirm = $('cConfirm');
+const toastEl = $('toast');
+const gameEl = $('game');
+const leftHalf = document.querySelector('.half-left');
+const rightHalf = document.querySelector('.half-right');
+const settingsBtn = $('settingsBtn'), settingsModal = $('settingsModal'), closeSettings = $('closeSettings');
+const sndEnabled = $('sndEnabled'), sndVolume = $('sndVolume'), sndVolumeVal = $('sndVolumeVal');
+const sndClick = $('sndClick'), sndClickVal = $('sndClickVal');
+const sndEvents = $('sndEvents'), sndEventsVal = $('sndEventsVal');
+const testClick = $('testClick'), testCrit = $('testCrit'), testBuy = $('testBuy'), testRebirth = $('testRebirth');
+const exportSave = $('exportSave'), importSave = $('importSave'), hardReset = $('hardReset');
+const showConfig = $('showConfig');
+
+const upgradeBtnRefs = {};
+const treeNodeRefs = {};
+const treeEls = [];
+
+/* ══════ SAVE ══════ */
+function saveNow() {
+  try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(state)); saveDirty = false; } catch(e) {}
+}
+function scheduleSave() {
+  saveDirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { if (saveDirty) saveNow(); }, CONFIG.saveDebounceMs);
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(CONFIG.saveKey);
+    if (raw) {
+      const data = JSON.parse(raw);
+      for (const k in state) if (k in data) state[k] = data[k];
+      if (!state.upgrades || typeof state.upgrades !== 'object') state.upgrades = {};
+      if (!state.tree || typeof state.tree !== 'object') state.tree = {};
+    }
+  } catch(e) {}
+}
+
+/* ══════ ТОСТ ══════ */
+let toastTimer = null;
+function showToast(text, duration = 2200) {
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
+}
+
+/* ══════ BUILD UI ══════ */
+function buildUpgrades() {
+  upgradesEl.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const key in UPGRADES) {
+    const u = UPGRADES[key];
+    const btn = document.createElement('button');
+    btn.className = 'upgrade-btn';
+    btn.dataset.key = key;
+    btn.innerHTML = `<span class="name">${u.name}</span><span class="lvl"></span><span class="cost"></span><span class="eff"></span>`;
+    frag.appendChild(btn);
+    upgradeBtnRefs[key] = {
+      root: btn,
+      lvl: btn.querySelector('.lvl'),
+      cost: btn.querySelector('.cost'),
+      eff: btn.querySelector('.eff'),
+    };
+  }
+  upgradesEl.appendChild(frag);
+}
+upgradesEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.upgrade-btn');
+  if (!btn || btn.disabled) return;
+  buyUpgrade(btn.dataset.key);
+});
+
+function buildTree() {
+  treeGrid.innerHTML = '';
+  treeEls.length = 0;
+  const frag = document.createDocumentFragment();
+  for (const id in TREE) {
+    const n = TREE[id];
+    const el = document.createElement('div');
+    el.className = 'tree-node';
+    el.dataset.node = id;
+    el.style.gridColumn = (n.col + 1);
+    el.style.gridRow = (n.row + 1);
+    el.innerHTML = `<span class="icon">${n.icon}</span><span class="name">${n.name}</span><span class="lvl"></span><span class="cost"></span>`;
+    frag.appendChild(el);
+    treeNodeRefs[id] = {
+      root: el,
+      lvl: el.querySelector('.lvl'),
+      cost: el.querySelector('.cost'),
+    };
+    treeEls.push({ id, el });
+  }
+  treeGrid.appendChild(frag);
+}
+treeGrid.addEventListener('click', (e) => {
+  const el = e.target.closest('.tree-node');
+  if (!el) return;
+  buyTreeNode(el.dataset.node);
+});
+
+/* ══════ UPDATE UI ══════ */
+function updateUI() {
+  counterEl.textContent = formatNum(state.count) + ' ❤';
+  perClickEl.textContent = '+' + formatNum(clickPowerBase()) + ' / клик';
+  perSecEl.textContent = '+' + formatNum(autoPerSec()) + ' / сек';
+  const cc = critChance();
+  critInfoEl.textContent = cc > 0 ? ' · 💥 ' + (cc * 100).toFixed(0) + '%' : '';
+
+  const mc = maxCombo();
+  const pct = Math.min(100, (combo / mc) * 100);
+  comboFillEl.style.width = pct + '%';
+  if (combo > 0) {
+    const m = computeMods();
+    comboLabelEl.classList.add('show');
+    comboLabelEl.textContent = `🔥 Комбо x${combo} (+${(combo * m.comboBonusPerStack * 100).toFixed(0)}%)`;
+  } else {
+    comboLabelEl.classList.remove('show');
+  }
+  // При комбо >= 70% от максимума — hot-режим (усиленный тремор, ярче glow)
+  heartEl.classList.toggle('hot', mc > 10 && combo >= mc * 0.7);
+
+  if (state.shards > 0) {
+    shardsInfoEl.classList.add('show');
+    const bonus = (Math.pow(1 + computeMods().shardBonus, state.shards) - 1) * 100;
+    shardsInfoEl.textContent = `💎 ${state.shards} (+${bonus.toFixed(0)}%)`;
+  } else {
+    shardsInfoEl.classList.remove('show');
+  }
+
+  for (const key in upgradeBtnRefs) {
+    const r = upgradeBtnRefs[key];
+    const u = UPGRADES[key];
+    const lvl = state.upgrades[key] || 0;
+    const c = upgradeCost(key);
+    const maxed = lvl >= u.maxLevel;
+    r.root.disabled = maxed || state.count < c;
+    r.lvl.textContent = maxed ? '★ МАКС' : 'Ур. ' + lvl;
+    r.cost.textContent = maxed ? '—' : 'Цена: ' + formatNum(c);
+    r.eff.textContent = u.effText(lvl);
+  }
+
+  const eligible = state.runEarned >= CONFIG.rebirthThreshold;
+  prestigeBtn.classList.toggle('unavailable', !eligible);
+  prestigeBtn.classList.toggle('ready', eligible);
+  if (eligible) {
+    prestigeInfo.textContent = `+${calcShards(state.runEarned)} 💎 за ${formatNum(state.runEarned)} ❤`;
+  } else {
+    prestigeInfo.textContent = `нужно ${formatNum(CONFIG.rebirthThreshold - state.runEarned)} ❤`;
+  }
+  treeBadge.textContent = state.shards;
+}
+
+function updateTreeUI() {
+  treeShardsEl.textContent = state.shards;
+  treeBadge.textContent = state.shards;
+  for (const id in treeNodeRefs) {
+    const n = TREE[id];
+    const r = treeNodeRefs[id];
+    const lvl = treeLevel(id);
+    const unlocked = treeUnlocked(id);
+    const maxed = lvl >= n.maxLevel;
+    const c = treeCost(id);
+    const canAfford = state.shards >= c;
+    const cl = r.root.classList;
+    cl.remove('available', 'locked', 'owned', 'maxed');
+    if (maxed) cl.add('maxed');
+    else if (!unlocked) cl.add('locked');
+    else if (canAfford) cl.add('available');
+    else if (lvl > 0) cl.add('owned');
+    r.lvl.textContent = maxed ? `★ МАКС ${lvl}/${n.maxLevel}` : `Ур. ${lvl}/${n.maxLevel}`;
+    if (maxed) { r.cost.textContent = n.desc; r.cost.className = 'cost'; }
+    else if (!unlocked) { r.cost.textContent = '🔒'; r.cost.className = 'cost'; }
+    else {
+      r.cost.textContent = `💎${c} — ${n.desc}`;
+      r.cost.className = 'cost ' + (canAfford ? 'cheap' : 'poor');
+    }
+  }
+  if (treeModal.classList.contains('open')) drawTreeLines();
+}
+
+function markUI() { uiDirty = true; }
+function uiTick() {
+  if (uiDirty) { uiDirty = false; updateUI(); }
+  requestAnimationFrame(uiTick);
+}
+
+/* ══════ ПОКУПКИ ══════ */
+function buyUpgrade(key) {
+  const u = UPGRADES[key];
+  const lvl = state.upgrades[key] || 0;
+  if (lvl >= u.maxLevel) return;
+  const c = upgradeCost(key);
+  if (state.count < c) { playSound('error'); return; }
+  state.count -= c;
+  state.upgrades[key] = lvl + 1;
+  invalidateMods();
+  playSound('buyUpgrade');
+  particles.burst('ambient', 6);
+  shakeScreen(1.5);
+  markUI();
+  scheduleSave();
+}
+function buyTreeNode(id) {
+  const n = TREE[id];
+  if (!n) return;
+  if (!treeUnlocked(id)) { playSound('error'); showToast('🔒 Сначала прокачай предыдущие'); return; }
+  const lvl = treeLevel(id);
+  if (lvl >= n.maxLevel) return;
+  const c = treeCost(id);
+  if (state.shards < c) { playSound('error'); showToast('💎 Не хватает осколков'); return; }
+  state.shards -= c;
+  state.tree[id] = lvl + 1;
+  invalidateMods();
+  playSound('buyNode');
+  updateTreeUI();
+  markUI();
+  scheduleSave();
+}
+
+/* ══════ КЛИК ══════ */
+function addHearts(a) {
+  state.count += a; state.runEarned += a; state.allEarned += a;
+}
+
+let lastClickFrame = 0;
+function doClick(x, y) {
+  const now = performance.now();
+  if (now - lastClickFrame < 20) return;
+  lastClickFrame = now;
+
+  const wasCombo = combo;
+  if (now - lastClickTime < 2000) combo = Math.min(combo + 1, maxCombo());
+  else combo = 1;
+  lastClickTime = now;
+  if (combo === maxCombo() && wasCombo !== combo) playSound('comboMax');
+
+  let gain = clickPower();
+  const isCrit = Math.random() < critChance();
+  if (isCrit) gain *= critMult();
+  addHearts(gain);
+
+  playSound(isCrit ? 'crit' : 'click', { volumeMul: isCrit ? 1.2 : 1 });
+
+  // Частицы
+  particles.float((isCrit ? '💥 +' : '+') + formatNum(gain), x, y, isCrit);
+  particles.ring(x, y, isCrit);
+  particles.spark(x, y, isCrit ? 14 : 8, isCrit);
+
+  // Живое нажатие сердечка
+  hitHeart(isCrit);
+
+  // Тряска экрана — на каждый клик, сильнее при крите и высоком комбо
+  const comboRatio = maxCombo() > 0 ? combo / maxCombo() : 0;
+  const intensity = isCrit
+    ? CONFIG.hitShakeCrit
+    : CONFIG.hitShakeBase + comboRatio * CONFIG.hitShakeCombo;
+  shakeScreen(intensity);
+
+  counterEl.classList.add('pop');
+  setTimeout(() => counterEl.classList.remove('pop'), 90);
+
+  if (isCrit) {
+    heartEl.classList.add('crit');
+    setTimeout(() => heartEl.classList.remove('crit'), 160);
+    if (navigator.vibrate) navigator.vibrate(20);
+  }
+
+  markUI();
+  scheduleSave();
+}
+
+/* ══════ ДИНАМИКА: живое нажатие + тряска ══════ */
+const heartWrapEl = document.querySelector('.heart-wrap');
+
+function hitHeart(isCrit) {
+  if (!heartWrapEl) return;
+  heartWrapEl.classList.add('hitting');
+
+  // Случайные параметры — каждый клик уникален
+  const dirX  = (Math.random() - 0.5) * (isCrit ? 34 : 14);
+  const dirY  = (Math.random() - 0.5) * (isCrit ? 34 : 14);
+  const rot   = (Math.random() - 0.5) * (isCrit ? 22 : 10);
+  const squashX = 0.68 + Math.random() * 0.08;
+  const squashY = 0.82 + Math.random() * 0.08;
+  const stretch = isCrit ? 1.45 : 1.22;
+  const dur = isCrit ? 440 : 260;
+
+  let anim;
+  try {
+    anim = heartWrapEl.animate([
+      { transform: `translate(0,0) scale(${squashX}, ${squashY}) rotate(${rot * 0.3}deg)` },
+      { transform: `translate(${dirX}px, ${dirY}px) scale(${stretch}, 1.05) rotate(${rot}deg)`, offset: 0.4 },
+      { transform: `translate(${-dirX * 0.5}px, ${-dirY * 0.5}px) scale(0.94, 0.97) rotate(${-rot * 0.5}deg)`, offset: 0.72 },
+      { transform: `translate(${dirX * 0.15}px, ${dirY * 0.15}px) scale(1.02) rotate(${rot * 0.15}deg)`, offset: 0.88 },
+      { transform: 'translate(0,0) scale(1, 1) rotate(0)' },
+    ], {
+      duration: dur,
+      easing: 'cubic-bezier(.22, 1.4, .36, 1)',
+    });
+  } catch(e) {
+    heartWrapEl.classList.remove('hitting');
+    return;
+  }
+  anim.onfinish = () => {
+    heartWrapEl.classList.remove('hitting');
+    try { anim.cancel(); } catch(e) {}
+  };
+}
+
+// Тряска сцены (только игровые элементы, не модалки)
+let shakeAnim = null;
+function shakeScreen(intensity) {
+  if (!gameEl || intensity <= 0) return;
+  const sx = (Math.random() - 0.5) * 2 * intensity;
+  const sy = (Math.random() - 0.5) * 2 * intensity;
+  const sr = (Math.random() - 0.5) * intensity * 0.12;
+  const dur = 70 + intensity * 22;
+
+  try {
+    if (shakeAnim) shakeAnim.cancel();
+    shakeAnim = gameEl.animate([
+      { transform: 'translate(0,0) rotate(0)' },
+      { transform: `translate(${sx}px, ${sy}px) rotate(${sr}deg)`, offset: 0.15 },
+      { transform: `translate(${-sx * 0.65}px, ${-sy * 0.5}px) rotate(${-sr * 0.55}deg)`, offset: 0.45 },
+      { transform: `translate(${sx * 0.4}px, ${sy * 0.3}px) rotate(${sr * 0.3}deg)`, offset: 0.72 },
+      { transform: 'translate(0,0) rotate(0)' },
+    ], { duration: dur, easing: 'ease-out' });
+  } catch(e) {}
+}
+
+/* ══════ ВВОД ══════ */
+let releaseTimer = null;
+let isPressing = false;
+function pressDown() {
+  if (isPressing) return;
+  isPressing = true;
+  clearTimeout(releaseTimer);
+  heartEl.classList.add('pressing');
+}
+function pressRelease() {
+  if (!isPressing) return;
+  isPressing = false;
+  heartEl.classList.remove('pressing');
+  releaseTimer = setTimeout(() => heartEl.classList.remove('pressing'), 30);
+}
+
+heartEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  pressDown();
+  doClick(e.clientX, e.clientY);
+}, { passive: false });
+window.addEventListener('pointerup', pressRelease, { passive: true });
+window.addEventListener('pointercancel', pressRelease, { passive: true });
+
+/* ══════ РЕБИТХ ══════ */
+prestigeBtn.addEventListener('click', () => {
+  const gained = calcShards(state.runEarned);
+  if (gained <= 0) {
+    playSound('error');
+    showToast(`💔 Нужно ещё ${formatNum(CONFIG.rebirthThreshold - state.runEarned)} ❤`);
+    return;
+  }
+  cEarned.textContent = formatNum(state.runEarned) + ' ❤';
+  cGain.textContent = '+' + gained + ' 💎';
+  cShards.textContent = state.shards;
+  confirmModal.classList.add('open');
+  playSound('open');
+});
+
+cCancel.addEventListener('click', () => { confirmModal.classList.remove('open'); playSound('close'); });
+confirmModal.addEventListener('click', (e) => {
+  if (e.target === confirmModal) { confirmModal.classList.remove('open'); playSound('close'); }
+});
+cConfirm.addEventListener('click', () => {
+  confirmModal.classList.remove('open');
+  doRebirth();
+});
+
+async function doRebirth() {
+  const gained = calcShards(state.runEarned);
+  if (gained <= 0) return;
+
+  playSound('rebirth');
+  flashEl.classList.add('on');
+  setTimeout(() => flashEl.classList.remove('on'), 120);
+
+  // Мега-тряска через анимацию .game
+  gameEl.classList.add('mega-shake');
+  if (navigator.vibrate) navigator.vibrate([30, 40, 60, 40, 100]);
+
+  const wrap = heartEl.querySelector('.heart-wrap');
+  if (wrap) {
+    // Снимаем idle/CSS-анимации на время
+    wrap.style.animation = 'none';
+    wrap.classList.remove('hitting');
+  }
+
+  const rect = heartEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  let splitL, splitR;
+  try {
+    splitL = leftHalf.animate([
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+      { transform: 'translate(-100px, 60px) rotate(-55deg) scale(0.7)', opacity: 0 },
+    ], { duration: 700, easing: 'cubic-bezier(.4,0,.9,.6)', fill: 'forwards' });
+    splitR = rightHalf.animate([
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+      { transform: 'translate(100px, 60px) rotate(55deg) scale(0.7)', opacity: 0 },
+    ], { duration: 700, easing: 'cubic-bezier(.4,0,.9,.6)', fill: 'forwards' });
+  } catch(e) {}
+
+  particles.spark(cx, cy, 32, true);
+  setTimeout(() => particles.spark(cx, cy, 20, true), 300);
+  setTimeout(() => particles.shards(cx, cy, 24), 400);
+
+  if (splitL && splitR) {
+    try { await Promise.all([splitL.finished, splitR.finished]); } catch(e) {}
+  } else {
+    await new Promise(r => setTimeout(r, 700));
+  }
+
+  state.shards += gained;
+  if (!state.tree.root) state.tree.root = 1;
+  state.count = 0; state.runEarned = 0; state.upgrades = {};
+  combo = 0;
+  invalidateMods();
+
+  buildUpgrades();
+  updateUI();
+  updateTreeUI();
+  saveNow();
+
+  try {
+    const backL = leftHalf.animate([
+      { transform: 'translate(-100px, 60px) rotate(-55deg) scale(0.7)', opacity: 0 },
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+    ], { duration: 550, easing: 'cubic-bezier(.3,.9,.4,1.6)', fill: 'forwards' });
+    const backR = rightHalf.animate([
+      { transform: 'translate(100px, 60px) rotate(55deg) scale(0.7)', opacity: 0 },
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+    ], { duration: 550, easing: 'cubic-bezier(.3,.9,.4,1.6)', fill: 'forwards' });
+    await Promise.all([backL.finished, backR.finished]);
+  } catch(e) {}
+
+  leftHalf.getAnimations().forEach(a => a.cancel());
+  rightHalf.getAnimations().forEach(a => a.cancel());
+  if (wrap) wrap.style.animation = '';
+
+  gameEl.classList.remove('mega-shake');
+
+  playSound('shard');
+  particles.float('💎 +' + gained, cx, cy - 40, true);
+  particles.burst('ambient', 20);
+  showToast(`💎 +${gained} осколков!`, 3500);
+}
+
+/* ══════ CANVAS-ЧАСТИЦЫ ══════ */
+const particles = (() => {
+  const canvas = document.getElementById('fx');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  resize();
+  let resizeRaf = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(resize);
+  }, { passive: true });
+
+  const MAX = 240;
+  const pool = new Array(MAX);
+  for (let i = 0; i < MAX; i++) pool[i] = { active: false };
+  let head = 0;
+  function acquire() {
+    for (let i = 0; i < MAX; i++) {
+      const p = pool[(head + i) % MAX];
+      if (!p.active) { head = (head + i + 1) % MAX; return p; }
+    }
+    const p = pool[head]; head = (head + 1) % MAX; return p;
+  }
+
+  const HEART_CHARS = ['❤','♥','💖','✨','✦','💫'];
+
+  function spawn(cfg) {
+    const p = acquire();
+    p.active = true;
+    p.type = cfg.type;
+    p.x = cfg.x; p.y = cfg.y;
+    p.vx = cfg.vx || 0; p.vy = cfg.vy || 0;
+    p.g = cfg.g || 0;
+    p.life = 0;
+    p.maxLife = cfg.maxLife || 0.9;
+    p.size = cfg.size || 6;
+    p.color = cfg.color || '#ff2d55';
+    p.text = cfg.text || '';
+    p.char = cfg.char || null;
+    p.isCrit = !!cfg.isCrit;
+    p.rotation = Math.random() * Math.PI * 2;
+    p.vr = cfg.vr || 0;
+    p.dragging = cfg.dragging || 0;
+  }
+
+  function float(text, x, y, crit) {
+    spawn({ type: 'text', x, y, text, size: crit ? 26 : 20,
+      vy: -80, maxLife: 0.9, color: crit ? '#ffd700' : '#fff', isCrit: crit });
+  }
+  function spark(x, y, count, crit) {
+    if (LOW_END) count = Math.ceil(count / 2);
+    for (let i = 0; i < count; i++) {
+      const a = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const dist = 70 + Math.random() * (crit ? 160 : 100);
+      const speed = dist / 0.6;
+      const useHeart = Math.random() < 0.35;
+      spawn({
+        type: useHeart ? 'char' : 'circle',
+        x, y,
+        vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+        dragging: 3.5,
+        size: useHeart ? 12 + Math.random() * 8 : 3 + Math.random() * (crit ? 6 : 4),
+        maxLife: 0.5 + Math.random() * 0.4,
+        color: crit ? '#ffd700' : '#ff2d55',
+        char: useHeart ? HEART_CHARS[(Math.random() * HEART_CHARS.length) | 0] : null,
+        isCrit: crit,
+        vr: (Math.random() - 0.5) * 12,
+      });
+    }
+  }
+  function ring(x, y, crit) {
+    spawn({ type: 'ring', x, y, size: 8, maxLife: 0.5,
+      color: crit ? '#ffd700' : '#ff2d55' });
+  }
+  function shards(x, y, count) {
+    if (LOW_END) count = Math.ceil(count / 2);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const dist = 100 + Math.random() * 200;
+      spawn({
+        type: 'shard', x, y,
+        vx: Math.cos(a) * dist * 1.4, vy: Math.sin(a) * dist * 1.4,
+        dragging: 2.5,
+        size: 6 + Math.random() * 8,
+        maxLife: 0.9 + Math.random() * 0.4,
+        color: '#7de0ff',
+        vr: (Math.random() - 0.5) * 20,
+      });
+    }
+  }
+  function burst(kind, n) {
+    if (kind === 'ambient') {
+      if (LOW_END && Math.random() > 0.5) return;
+      for (let i = 0; i < n; i++) {
+        spawn({
+          type: 'char',
+          x: Math.random() * W, y: H + 20,
+          vy: -80 - Math.random() * 60,
+          size: 14 + Math.random() * 20,
+          maxLife: 4 + Math.random() * 3,
+          color: '#ff2d55',
+          char: HEART_CHARS[(Math.random() * HEART_CHARS.length) | 0],
+          vr: (Math.random() - 0.5) * 2,
+        });
+      }
+    }
+  }
+
+  let lastTime = performance.now();
+  function tick(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+    ctx.clearRect(0, 0, W, H);
+    for (let i = 0; i < MAX; i++) {
+      const p = pool[i];
+      if (!p.active) continue;
+      p.life += dt;
+      const t = p.life / p.maxLife;
+      if (t >= 1) { p.active = false; continue; }
+      const alpha = 1 - t;
+      const drag = p.dragging ? Math.exp(-p.dragging * dt) : 1;
+      p.vx *= drag; p.vy *= drag;
+      p.vy += p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.rotation += p.vr * dt;
+      ctx.globalAlpha = alpha;
+      if (p.type === 'circle') {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * (1 - t * 0.6), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'shard') {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -p.size); ctx.lineTo(p.size * 0.7, 0);
+        ctx.lineTo(0, p.size); ctx.lineTo(-p.size * 0.7, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (p.type === 'char') {
+        ctx.save();
+        ctx.translate(p.x, p.y); ctx.rotate(p.rotation);
+        ctx.font = `${p.size}px system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.char, 0, 0);
+        ctx.restore();
+      } else if (p.type === 'text') {
+        ctx.font = `800 ${p.size}px system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (p.isCrit) { ctx.shadowColor = p.color; ctx.shadowBlur = 12; }
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.shadowBlur = 0;
+      } else if (p.type === 'ring') {
+        const r = p.size + t * 70;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2 + (1 - t) * 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  return { float, spark, ring, shards, burst };
+})();
+
+const LOW_END = (() => {
+  const cores = navigator.hardwareConcurrency || 4;
+  const mem = navigator.deviceMemory || 4;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 500;
+  return small || cores <= 2 || mem <= 2;
+})();
+
+/* ══════ ДЕРЕВО: линии ══════ */
+let treeLineRaf = 0;
+function drawTreeLines() {
+  cancelAnimationFrame(treeLineRaf);
+  treeLineRaf = requestAnimationFrame(() => {
+    if (!treeModal.classList.contains('open')) return;
+    const area = treeLines.parentElement;
+    const aRect = area.getBoundingClientRect();
+    if (aRect.width === 0) return;
+    treeLines.setAttribute('viewBox', `0 0 ${aRect.width} ${aRect.height}`);
+    const frag = document.createDocumentFragment();
+    const NS = 'http://www.w3.org/2000/svg';
+    for (const { id, el } of treeEls) {
+      const node = TREE[id];
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2 - aRect.left;
+      const cy = r.top + r.height / 2 - aRect.top;
+      for (const req of node.requires) {
+        const reqEl = treeNodeRefs[req]?.root;
+        if (!reqEl) continue;
+        const rr = reqEl.getBoundingClientRect();
+        const rx = rr.left + rr.width / 2 - aRect.left;
+        const ry = rr.top + rr.height / 2 - aRect.top;
+        const line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', rx); line.setAttribute('y1', ry);
+        line.setAttribute('x2', cx); line.setAttribute('y2', cy);
+        const active = treeLevel(req) > 0;
+        line.setAttribute('stroke', active ? '#ffd700' : 'rgba(255,45,85,0.35)');
+        line.setAttribute('stroke-width', active ? '2.5' : '2');
+        if (!active) line.setAttribute('stroke-dasharray', '4 4');
+        frag.appendChild(line);
+      }
+    }
+    treeLines.innerHTML = '';
+    treeLines.appendChild(frag);
+  });
+}
+
+/* ══════ МОДАЛКИ ══════ */
+function openModal(el, sound = 'open') { el.classList.add('open'); playSound(sound); }
+function closeModal(el) { el.classList.remove('open'); playSound('close'); }
+
+treeBtn.addEventListener('click', () => {
+  openModal(treeModal);
+  updateTreeUI();
+  setTimeout(drawTreeLines, 60);
+});
+closeTreeBtn.addEventListener('click', () => closeModal(treeModal));
+treeModal.addEventListener('click', (e) => { if (e.target === treeModal) closeModal(treeModal); });
+
+settingsBtn.addEventListener('click', () => { openModal(settingsModal); syncSettingsUI(); });
+closeSettings.addEventListener('click', () => closeModal(settingsModal));
+settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeModal(settingsModal); });
+
+window.addEventListener('resize', () => {
+  if (treeModal.classList.contains('open')) drawTreeLines();
+});
+
+/* ══════ НАСТРОЙКИ ══════ */
+function syncSettingsUI() {
+  sndEnabled.checked = audioSettings.enabled;
+  const mp = Math.round(audioSettings.masterVolume * 100);
+  const cp = Math.round(audioSettings.clickVolume * 100);
+  const ep = Math.round(audioSettings.eventsVolume * 100);
+  sndVolume.value = mp; sndVolumeVal.textContent = mp + '%';
+  sndClick.value = cp; sndClickVal.textContent = cp + '%';
+  sndEvents.value = ep; sndEventsVal.textContent = ep + '%';
+}
+sndEnabled.addEventListener('change', () => {
+  audioSettings.enabled = sndEnabled.checked;
+  saveAudioSettings();
+  if (audioSettings.enabled) playSound('click');
+});
+sndVolume.addEventListener('input', () => {
+  audioSettings.masterVolume = sndVolume.value / 100;
+  sndVolumeVal.textContent = sndVolume.value + '%';
+  saveAudioSettings();
+});
+sndClick.addEventListener('input', () => {
+  audioSettings.clickVolume = sndClick.value / 100;
+  sndClickVal.textContent = sndClick.value + '%';
+  saveAudioSettings();
+});
+sndEvents.addEventListener('input', () => {
+  audioSettings.eventsVolume = sndEvents.value / 100;
+  sndEventsVal.textContent = sndEvents.value + '%';
+  saveAudioSettings();
+});
+
+testClick.addEventListener('click', () => playSound('click'));
+testCrit.addEventListener('click', () => playSound('crit'));
+testBuy.addEventListener('click', () => playSound('buyUpgrade'));
+testRebirth.addEventListener('click', () => playSound('rebirth'));
+
+exportSave.addEventListener('click', async () => {
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  try {
+    await navigator.clipboard.writeText(b64);
+    showToast('📤 Скопировано');
+  } catch(e) { prompt('Скопируй:', b64); }
+});
+importSave.addEventListener('click', () => {
+  const b64 = prompt('Вставь строку сохранения:');
+  if (!b64) return;
+  try {
+    const json = decodeURIComponent(escape(atob(b64.trim())));
+    const data = JSON.parse(json);
+    for (const k in state) if (k in data) state[k] = data[k];
+    if (!state.upgrades || typeof state.upgrades !== 'object') state.upgrades = {};
+    if (!state.tree || typeof state.tree !== 'object') state.tree = {};
+    invalidateMods();
+    buildUpgrades(); updateUI(); updateTreeUI(); saveNow();
+    showToast('✅ Загружено');
+  } catch(e) { playSound('error'); showToast('❌ Неверная строка'); }
+});
+hardReset.addEventListener('click', () => {
+  if (!confirm('Сбросить ВСЁ?')) return;
+  for (const k in state) state[k] = (k === 'tree' || k === 'upgrades') ? {} : 0;
+  combo = 0; invalidateMods();
+  buildUpgrades(); updateUI(); updateTreeUI(); saveNow();
+  showToast('☠ Сброшено');
+});
+showConfig.addEventListener('click', () => {
+  const cfg = {
+    CONFIG,
+    UPGRADES: Object.fromEntries(Object.entries(UPGRADES).map(([k, v]) => [k, { name: v.name, baseCost: v.baseCost, growth: v.growth, maxLevel: v.maxLevel }])),
+    TREE: Object.fromEntries(Object.entries(TREE).map(([k, v]) => [k, { name: v.name, maxLevel: v.maxLevel, costs: v.costs, requires: v.requires }])),
+  };
+  const text = JSON.stringify(cfg, null, 2);
+  console.log('CONFIG:\n', text);
+  navigator.clipboard?.writeText(text).catch(() => {});
+  showToast('📋 CONFIG в консоли + буфере');
+});
+
+/* ══════ СБРОС ДОЛГИМ ТАПОМ ══════ */
+let resetHold = null;
+resetBtn.addEventListener('pointerdown', () => {
+  resetHold = setTimeout(() => {
+    if (confirm('Сбросить ВСЁ?')) {
+      for (const k in state) state[k] = (k === 'tree' || k === 'upgrades') ? {} : 0;
+      combo = 0; invalidateMods();
+      buildUpgrades(); updateUI(); updateTreeUI(); saveNow();
+      showToast('Сброшено');
+    }
+  }, 700);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => {
+  resetBtn.addEventListener(ev, () => clearTimeout(resetHold), { passive: true });
+});
+
+/* ══════ ГЛАВНЫЙ ЦИКЛ ══════ */
+let autoAccum = 0;
+let lastAutoTime = performance.now();
+function autoTick(now) {
+  const dt = (now - lastAutoTime) / 1000;
+  lastAutoTime = now;
+  const gain = autoPerSec() * dt;
+  if (gain > 0) { addHearts(gain); markUI(); }
+  if (combo > 0 && now - lastClickTime > CONFIG.comboDecayDelayMs) {
+    autoAccum += dt * 1000;
+    if (autoAccum >= CONFIG.comboDecayMs) {
+      autoAccum = 0;
+      combo = Math.max(0, combo - 1);
+      markUI();
+    }
+  } else { autoAccum = 0; }
+  requestAnimationFrame(autoTick);
+}
+requestAnimationFrame(autoTick);
+
+setInterval(() => { if (saveDirty) saveNow(); }, CONFIG.autoSaveMs);
+window.addEventListener('pagehide', () => { if (saveDirty) saveNow(); }, { passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && saveDirty) saveNow();
+});
+
+/* ══════ СТАРТ ══════ */
+document.addEventListener('pointerdown', () => initAudio(), { once: true, passive: true });
+document.addEventListener('touchstart', () => initAudio(), { once: true, passive: true });
+document.addEventListener('keydown', () => initAudio(), { once: true });
+
+loadAudioSettings();
+load();
+buildUpgrades();
+buildTree();
+updateUI();
+updateTreeUI();
+syncSettingsUI();
+uiTick();
+</script>
+</body>
+</html>
