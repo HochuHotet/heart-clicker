@@ -1,12 +1,25 @@
 {
-  "background_color": "#ff2d55",
-  "dir": "ltr",
-  "display": "fullscreen",
   "name": "HeartClicker",
-  "orientation": "portrait",
-  "scope": "/",
   "short_name": "HeartClicker",
+  "description": "Кликер сердечек с ребитхами и апгрейдами",
   "start_url": "/",
-  "theme_color": "#0a0006",
-  "description": "Кликер сердечек с ребитхами и апгрейдами"
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0006",
+  "theme_color": "#FF2D55",
+  "icons": [
+    {
+      "src": "launchericon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "launchericon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
