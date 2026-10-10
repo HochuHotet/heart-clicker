@@ -1,0 +1,12 @@
+{
+  "background_color": "#ff2d55",
+  "dir": "ltr",
+  "display": "fullscreen",
+  "name": "HeartClicker",
+  "orientation": "portrait",
+  "scope": "/",
+  "short_name": "HeartClicker",
+  "start_url": "/",
+  "theme_color": "#0a0006",
+  "description": "Кликер сердечек с ребитхами и апгрейдами"
+}
